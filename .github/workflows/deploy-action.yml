@@ -1,0 +1,74 @@
+# how to setup https://hoohoo.top/blog/20210525232300-github-action-auto-ssh-to-host-and-excute-script/
+# 1. generate keygen in server/local machine
+#    ssh-keygen -f ~/.ssh/github_actions/your_repo -t ed25519 -b 4096 -C "youremail@example.com"
+#
+# 2. Copy our public key to the remote server’s authorize
+#    cat github_actions/your_repo.pub >> .ssh/authorized_keys
+#
+# 3. copy our Private Key and paste it into Github Secrets.
+#    cat github_actions/your_repo >> Github Secrets -> ssh_key_ed25519
+
+name: 'Deploy app workflow'
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+    secrets:
+      ssh_host:
+        required: true
+      ssh_user:
+        required: true
+      ssh_key_ed25519:
+        required: true
+      ssh_port:
+        required: true
+
+jobs:
+  deploy-app:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      cancel-in-progress: true
+      group: ${{ inputs.environment }}
+    steps:
+      - name: Extract branch name from ${{ inputs.branch }}
+        shell: bash
+        # remove refs/heads prefix in INPUT_BRANCH using ${INPUT_BRANCH#refs/heads/}
+        run: echo "BRANCH=${INPUT_BRANCH#refs/heads/}" >> $GITHUB_OUTPUT
+        id: extract_branch
+        env:
+          INPUT_BRANCH: ${{ inputs.branch }}
+
+      - name: Deployment script below
+        run: |
+          echo "add your script here to deploy ${{ inputs.branch }} branch"
+          echo "extracted branch ${{ steps.extract_branch.outputs.BRANCH }}"
+
+      - name: Check ${{ inputs.environment }} env
+        run: |
+          [[ "${{ secrets.ssh_host }}" == "DEV" ]] && echo "env isDev"
+          [[ "${{ secrets.ssh_host }}" == "STAGING" ]] && echo "env isStaging"
+          echo "environment ${{ inputs.environment }}"
+
+      # To get current branch from github.ref
+      # github.ref is not applicable for reusable workflows
+      # Use the extracted branch from inputs.branch instead
+      # - name: Get the current branch name
+      #   shell: bash
+      #   run: echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+      #   id: extract_branch
+
+      # If you will build your app in server
+      # - name: Deploy ${{ steps.extract_branch.outputs.BRANCH }} branch to ${{ inputs.environment }}
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.ssh_host }}
+      #     username: ${{ secrets.ssh_user }}
+      #     key: ${{ secrets.ssh_key_ed25519 }}
+      #     port: ${{ secrets.ssh_port }}
+      #     script: sh /home/ubuntu/apps/deployments/deploy.sh boilerplate-ts-nodejs ${{ steps.extract_branch.outputs.BRANCH }}
